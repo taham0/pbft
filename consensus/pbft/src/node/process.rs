@@ -30,6 +30,9 @@ impl Context{
                 ProtMsg::Init(main_msg) => {
                     self.handle_init(main_msg, wrapper_msg.sender).await;
                 },
+                ProtMsg::Prepare(msg) => {
+                    self.handle_prepare(msg.content, msg.origin).await;
+                },
                 ProtMsg::Echo(msg) => {
                     self.handle_echo(msg.content, msg.origin).await;
                 }

@@ -1,4 +1,3 @@
-use log::info;
 use types::{Msg, ProtMsg};
 
 use super::Context;
@@ -57,10 +56,12 @@ impl Context {
 
             // if quorum reached start echo stage
             if self.quorum == (2*self.num_faults) + 1 {
+                self.quorum = 0;
+
                 log::info!("quorum reached, beginning echo stage...");
                 
                 // broadcast echo msg
-                self.broadcast(ProtMsg::Echo(Msg {
+                self.broadcast(ProtMsg::Prepare(Msg {
                     content: (self.values.clone()), 
                     origin: (self.myid) 
                 })).await;
@@ -68,7 +69,39 @@ impl Context {
         }
     }
 
+    pub async fn handle_prepare(&mut self, values: Vec<u64>, sender_id: usize) {
+        log::info!("received values vector {:?} from node {:?}", values, sender_id);
+
+        if !self.is_leader {
+            if self.echo {
+                // broadcast echo msg
+                self.broadcast(ProtMsg::Echo(Msg {
+                    content: (values.clone()), 
+                    origin: (self.myid) 
+                })).await;
+
+                self.echo = false;
+            }
+        }
+    }
+
     pub async fn handle_echo(&mut self, values: Vec<u64>, sender_id: usize) {
         log::info!("received values vector {:?} from node {:?}", values, sender_id);
+        self.echo_quorum += 1;
+
+        if self.echo_quorum == self.num_faults + 1 {
+            // broadcast echo msg
+            self.broadcast(ProtMsg::Echo(Msg {
+                content: (values.clone()), 
+                origin: (self.myid) 
+            })).await;
+
+            self.echo = false;
+        }
+
+        else if self.echo_quorum == self.num_nodes - self.num_faults {
+            // deliver values
+            log::info!("Delivering value vector {:?}", values);
+        }
     }
 }

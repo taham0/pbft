@@ -32,7 +32,7 @@ pub struct Context {
     pub values: Vec<u64>,
     pub quorum: usize,
     pub echo: bool,
-    pub vote: bool,
+    pub echo_quorum: usize,
 
     /// Secret Key map
     pub sec_key_map:HashMap<Replica, Vec<u8>>,
@@ -122,8 +122,8 @@ impl Context {
                 quorum: 0,
                 inp_message:message,
                 values: values,
-                echo: false,
-                vote: false
+                echo: true,
+                echo_quorum: 0
             };
             
             for (id, sk_data) in config.sk_map.clone() {
