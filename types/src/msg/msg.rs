@@ -15,6 +15,7 @@ pub enum ProtMsg{
     // Create your custom types of messages
     // Example type is a ping message, which takes a Message and the sender replica
     Init(u64),
+    Prepare(Msg),
     Echo(Msg),
 }
 
