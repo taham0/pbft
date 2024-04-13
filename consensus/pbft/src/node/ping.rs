@@ -9,18 +9,28 @@ impl Context {
     // the function. 
     pub async fn start_ping(self: &mut Context){
         // Draft a message
+        let data;
+
+        if self.is_leader {
+            data = "I am leader".to_string();
+        } else {
+            data = "I am not leader".to_string();
+        }
+
         let msg = Msg{
-            content: "Hi".as_bytes().to_vec(),
+            content: data.as_bytes().to_vec(),
             origin: self.myid
         };
+        
         // Wrap the message in a type
         // Use different types of messages like INIT, ECHO, .... for the Bracha's RBC implementation
         let protocol_msg = ProtMsg::Ping(msg, self.myid);
+
         // Broadcast the message to everyone
         self.broadcast(protocol_msg).await;
     }
 
     pub async fn handle_ping(self: &Context, msg:Msg){
-        log::info!("Received ping message {:?} from node {}",msg.content,msg.origin);
+        log::info!("Received ping message {:?} from node {}",String::from_utf8(msg.content).unwrap(), msg.origin);
     }
 }

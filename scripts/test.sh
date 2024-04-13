@@ -1,5 +1,3 @@
-# A script to test quickly
-
 killall {node} &> /dev/null
 rm -rf /tmp/*.db &> /dev/null
 vals=(27000 27100 27200 27300)
@@ -21,10 +19,11 @@ for((i=0;i<4;i++)); do
 ./target/$TYPE/node \
     --config $TESTDIR/nodes-$i.json \
     --ip ip_file \
-    --protocol rbc \
+    --protocol pbft \
     --input $2 \
     --syncer $1 \
     --byzantine $3 > logs/$i.log &
 done
 
-# Kill all nodes sudo lsof -ti:7000-7015 | xargs kill -9
+# sudo lsof -ti:7000-7015 | xargs kill -9
+# ./scripts/test.sh testdata/hyb_4/syncer Hi false

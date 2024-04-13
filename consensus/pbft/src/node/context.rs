@@ -10,12 +10,20 @@ use types::{{WrapperMsg, Replica, ProtMsg}, SyncMsg, SyncState};
 
 use super::{Handler, SyncHandler};
 
+fn vec_to_u64_big_endian(bytes: Vec<u8>) -> u64 {
+    let mut num = 0u64;
+    for (index, &byte) in bytes.iter().enumerate() {
+        num |= (byte as u64) << ((7 - index) * 8);
+    }
+    num
+}
 pub struct Context {
     /// Networking context
     pub net_send: TcpReliableSender<Replica,WrapperMsg,Acknowledgement>,
     pub net_recv: UnboundedReceiver<WrapperMsg>,
     pub sync_send:TcpReliableSender<Replica,SyncMsg,Acknowledgement>,
     pub sync_recv: UnboundedReceiver<SyncMsg>,
+
     /// Data context
     pub num_nodes: usize,
     pub myid: usize,
@@ -31,6 +39,7 @@ pub struct Context {
     exit_rx: oneshot::Receiver<()>,
 
     // Add your custom fields here
+    pub is_leader: bool,
 }
 
 impl Context {
@@ -39,35 +48,58 @@ impl Context {
         message: Vec<u8>
     )->anyhow::Result<oneshot::Sender<()>>{
         let mut consensus_addrs :FnvHashMap<Replica,SocketAddr>= FnvHashMap::default();
-        for (replica,address) in config.net_map.iter(){
+
+        // populate consensus_addr with network ip mappings (node_id, ip)
+        for (replica, address) in config.net_map.iter(){
             let address:SocketAddr = address.parse().expect("Unable to parse address");
             consensus_addrs.insert(*replica, SocketAddr::from(address.clone()));
         }
+
+        let number = vec_to_u64_big_endian(message.clone());
+
+        log::info!("number is {:?}", number);
+
+        let mut is_leader = false;
+
+        // set leader
+        if config.id == 0 {
+            is_leader = true;
+        }
+        
+        // get own address
         let my_port = consensus_addrs.get(&config.id).unwrap();
         let my_address = to_socket_address("0.0.0.0", my_port.port());
+        
+        // why is the client hardcoded to key 0?
         let mut syncer_map:FnvHashMap<Replica,SocketAddr> = FnvHashMap::default();
         syncer_map.insert(0, config.client_addr);
         
         // Setup networking
         let (tx_net_to_consensus, rx_net_to_consensus) = unbounded_channel();
+        
         TcpReceiver::<Acknowledgement, WrapperMsg, _>::spawn(
             my_address,
             Handler::new(tx_net_to_consensus),
         );
+        
+        // The server must listen to the client's messages on some port that is not being used to listen to other servers
         let syncer_listen_port = config.client_port;
         let syncer_l_address = to_socket_address("0.0.0.0", syncer_listen_port);
-        // The server must listen to the client's messages on some port that is not being used to listen to other servers
+        
         let (tx_net_to_client,rx_net_from_client) = unbounded_channel();
+        
         TcpReceiver::<Acknowledgement,SyncMsg,_>::spawn(
             syncer_l_address, 
             SyncHandler::new(tx_net_to_client)
         );
+        
         let consensus_net = TcpReliableSender::<Replica,WrapperMsg,Acknowledgement>::with_peers(
             consensus_addrs.clone()
         );
         
         let sync_net = TcpReliableSender::<Replica,SyncMsg,Acknowledgement>::with_peers(syncer_map);
         let (exit_tx, exit_rx) = oneshot::channel();
+        
         tokio::spawn(async move {
             let mut c = Context {
                 net_send:consensus_net,
@@ -80,24 +112,33 @@ impl Context {
                 num_faults: config.num_faults,
                 cancel_handlers:HashMap::default(),
                 exit_rx: exit_rx,
+                is_leader: is_leader,
 
                 inp_message:message
             };
+            
             for (id, sk_data) in config.sk_map.clone() {
                 c.sec_key_map.insert(id, sk_data.clone());
             }
-            //c.invoke_coin.insert(100, Duration::from_millis(sleep_time.try_into().unwrap()));
+            
             if let Err(e) = c.run().await {
                 log::error!("Consensus error: {}", e);
             }
         });
+
         Ok(exit_tx)
     }
 
     pub async fn broadcast(&mut self, protmsg:ProtMsg){
         let sec_key_map = self.sec_key_map.clone();
         for (replica,sec_key) in sec_key_map.into_iter() {
-            if replica != self.myid{
+            // if replica != self.myid{
+            //     let wrapper_msg = WrapperMsg::new(protmsg.clone(), self.myid, &sec_key.as_slice());
+            //     let cancel_handler:CancelHandler<Acknowledgement> = self.net_send.send(replica, wrapper_msg).await;
+            //     self.add_cancel_handler(cancel_handler);
+            // }
+
+            if self.is_leader || replica != self.myid{
                 let wrapper_msg = WrapperMsg::new(protmsg.clone(), self.myid, &sec_key.as_slice());
                 let cancel_handler:CancelHandler<Acknowledgement> = self.net_send.send(replica, wrapper_msg).await;
                 self.add_cancel_handler(cancel_handler);
@@ -123,7 +164,9 @@ impl Context {
         let cancel_handler = self.sync_send.send(0,
             SyncMsg { sender: self.myid, state: SyncState::ALIVE,value:"".to_string()}
         ).await;
+
         self.add_cancel_handler(cancel_handler);
+        
         loop {
             tokio::select! {
                 // Receive exit handlers
@@ -132,45 +175,53 @@ impl Context {
                     log::info!("Termination signal received by the server. Exiting.");
                     break
                 },
+
                 msg = self.net_recv.recv() => {
                     // Received messages are processed here
+                    // net_recv is the internal unbounded channel
                     log::debug!("Got a consensus message from the network: {:?}", msg);
                     let msg = msg.ok_or_else(||
                         anyhow!("Networking layer has closed")
                     )?;
                     self.process_msg(msg).await;
                 },
+
                 sync_msg = self.sync_recv.recv() =>{
                     let sync_msg = sync_msg.ok_or_else(||
                         anyhow!("Networking layer has closed")
                     )?;
+
                     match sync_msg.state {
-                        SyncState::START =>{
-                            log::error!("Consensus Start time: {:?}", SystemTime::now()
+                        SyncState::START => {
+                            log::info!("Consensus Start time: {:?}", SystemTime::now()
                                 .duration_since(UNIX_EPOCH)
                                 .unwrap()
                                 .as_millis());
                             // Start your protocol from here
                             // Write a function to broadcast a message. We demonstrate an example with a PING function
+
                             self.start_ping().await;
 
                             let cancel_handler = self.sync_send.send(0, SyncMsg { sender: self.myid, state: SyncState::STARTED, value:"".to_string()}).await;
                             self.add_cancel_handler(cancel_handler);
                         },
-                        SyncState::STOP =>{
+
+                        SyncState::STOP => {
                             // Code used for internal purposes
-                            log::error!("Consensus Stop time: {:?}", SystemTime::now()
+                            log::info!("Consensus Stop time: {:?}", SystemTime::now()
                                 .duration_since(UNIX_EPOCH)
                                 .unwrap()
                                 .as_millis());
                             log::info!("Termination signal received by the server. Exiting.");
                             break
                         },
+
                         _=>{}
                     }
                 },
             };
         }
+
         Ok(())
     }
 }

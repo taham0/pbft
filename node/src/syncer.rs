@@ -34,16 +34,20 @@ impl Syncer{
         let (tx_net_to_server, rx_net_to_server) = unbounded_channel();
         let cli_addr_sock = cli_addr.port();
         let new_sock_address = SocketAddrV4::new("0.0.0.0".parse().unwrap(), cli_addr_sock);
+        
         TcpReceiver::<Acknowledgement, SyncMsg, _>::spawn(
             std::net::SocketAddr::V4(new_sock_address),
             SyncHandler::new(tx_net_to_server),
         );
+
         let mut server_addrs :FnvHashMap<Replica,SocketAddr>= FnvHashMap::default();
         for (replica,address) in net_map.iter(){
             let address:SocketAddr = address.parse().expect("Unable to parse address");
             server_addrs.insert(*replica, SocketAddr::from(address.clone()));
         }
+
         let net_send = TcpReliableSender::<Replica,SyncMsg,Acknowledgement>::with_peers(server_addrs);
+        
         tokio::spawn(async move{
             let mut syncer = Syncer{
                 net_map:net_map.clone(),
@@ -60,18 +64,21 @@ impl Syncer{
                 exit_rx:exit_rx,
                 cancel_handlers:Vec::new()
             };
+            
             if let Err(e) = syncer.run().await {
                 log::error!("Consensus error: {}", e);
             }
         });
         Ok(exit_tx)
     }
+
     pub async fn broadcast(&mut self, sync_msg:SyncMsg){
         for replica in 0..self.num_nodes {
             let cancel_handler:CancelHandler<Acknowledgement> = self.net_send.send(replica, sync_msg.clone()).await;
             self.add_cancel_handler(cancel_handler);    
         }
     }
+
     pub async fn run(&mut self)-> Result<()>{
         loop {
             tokio::select! {
@@ -142,6 +149,7 @@ impl Syncer{
         }
         Ok(())
     }
+
     pub fn add_cancel_handler(&mut self, canc: CancelHandler<Acknowledgement>){
         self.cancel_handlers
             .push(canc);

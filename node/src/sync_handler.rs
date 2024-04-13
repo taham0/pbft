@@ -17,19 +17,19 @@ impl SyncHandler {
 
 #[async_trait]
 impl network::Handler<Acknowledgement, SyncMsg>
-    for SyncHandler
+for SyncHandler
 {
     async fn dispatch(
         &self,
         msg: SyncMsg,
         writer: &mut network::Writer<Acknowledgement>,
     ) {
-        // Forward the message
+        // Forward the message to internal channel
         self.consensus_tx
             .send(msg)
             .expect("Failed to send message to the consensus channel");
 
-        // Acknowledge
+        // Acknowledge the received sync message
         writer
             .send(Acknowledgement::Pong)
             .await
