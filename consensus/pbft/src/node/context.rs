@@ -29,6 +29,10 @@ pub struct Context {
     pub myid: usize,
     pub num_faults: usize,
     pub inp_message:Vec<u8>,
+    pub values: Vec<u64>,
+    pub quorum: usize,
+    pub echo: bool,
+    pub vote: bool,
 
     /// Secret Key map
     pub sec_key_map:HashMap<Replica, Vec<u8>>,
@@ -99,6 +103,8 @@ impl Context {
         
         let sync_net = TcpReliableSender::<Replica,SyncMsg,Acknowledgement>::with_peers(syncer_map);
         let (exit_tx, exit_rx) = oneshot::channel();
+
+        let values = Vec::new();
         
         tokio::spawn(async move {
             let mut c = Context {
@@ -113,8 +119,11 @@ impl Context {
                 cancel_handlers:HashMap::default(),
                 exit_rx: exit_rx,
                 is_leader: is_leader,
-
-                inp_message:message
+                quorum: 0,
+                inp_message:message,
+                values: values,
+                echo: false,
+                vote: false
             };
             
             for (id, sk_data) in config.sk_map.clone() {
@@ -200,7 +209,7 @@ impl Context {
                             // Start your protocol from here
                             // Write a function to broadcast a message. We demonstrate an example with a PING function
 
-                            self.start_ping().await;
+                            self.start_init().await;
 
                             let cancel_handler = self.sync_send.send(0, SyncMsg { sender: self.myid, state: SyncState::STARTED, value:"".to_string()}).await;
                             self.add_cancel_handler(cancel_handler);

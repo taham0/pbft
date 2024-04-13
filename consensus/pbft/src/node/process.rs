@@ -1,7 +1,7 @@
 use std::{sync::Arc};
 
 use crypto::hash::{verf_mac};
-use types::{{WrapperMsg, ProtMsg}};
+use types::{ProtMsg, WrapperMsg};
 use crate::node::{
     context::Context
 };
@@ -27,12 +27,12 @@ impl Context{
         let msg = Arc::new(wrapper_msg.clone());
         if self.check_proposal(msg){
             match wrapper_msg.clone().protmsg {
-                // Handle each message type appropriately and write functions to evaluate each type of message
-                ProtMsg::Ping(main_msg,rep)=> {
-                    // RBC initialized
-                    log::info!("Received Ping from node : {:?}",rep);
-                    self.handle_ping(main_msg).await;
+                ProtMsg::Init(main_msg) => {
+                    self.handle_init(main_msg, wrapper_msg.sender).await;
                 },
+                ProtMsg::Echo(msg) => {
+                    self.handle_echo(msg.content, msg.origin).await;
+                }
             }
         }
         else {
