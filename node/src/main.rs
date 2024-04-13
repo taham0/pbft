@@ -23,15 +23,6 @@ async fn main() -> Result<()> {
         .expect("Unable to read input string");
     let syncer_file = m.value_of("syncer")
         .expect("Unable to parse syncer ip file");
-    let byz_flag = m.value_of("byz")
-        .expect("Unable to parse Byzantine flag");
-    let node_normal:bool = match byz_flag {
-        "true"=> true,
-        "false" => false,
-        _=>{
-            panic!("Byz flag invalid value");
-        }
-    };
     let conf_file = std::path::Path::new(conf_str); // config path for node i
     let str = String::from(conf_str);
 
@@ -66,9 +57,6 @@ async fn main() -> Result<()> {
     // Start the Reliable Broadcast protocol
     let exit_tx;
     match vss_type{
-        "rbc" => {
-            exit_tx = rbc::node::Context::spawn(config, input_value.as_bytes().to_vec(),node_normal).unwrap();
-        },
         "pbft" => {
             exit_tx = pbft::node::Context::spawn(config, input_value.as_bytes().to_vec()).unwrap();
         },

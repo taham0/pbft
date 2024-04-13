@@ -5,7 +5,7 @@ use crate::{WireReady, Replica};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct Msg {
-    pub content: Vec<u8>,
+    pub content: Vec<u64>,
     pub origin:Replica,
     // Add your custom fields here
 }
@@ -14,7 +14,8 @@ pub struct Msg {
 pub enum ProtMsg{
     // Create your custom types of messages
     // Example type is a ping message, which takes a Message and the sender replica
-    Ping(Msg,Replica),
+    Init(u64),
+    Echo(Msg),
 }
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
