@@ -1,9 +1,10 @@
 killall {node} &> /dev/null
 rm -rf /tmp/*.db &> /dev/null
-vals=(27000 27100 27200 27300)
+# vals=(27000 27100 27200 27300)
+vals=(27000 27100 27200 27300 27400 27500 27600 27700 27800 27900 28000 28100 28200 28300 28400 28500)
 
 rand=$(shuf -i 1000-150000000 -n 1)
-TESTDIR=${TESTDIR:="testdata/hyb_4"}
+TESTDIR=${TESTDIR:="testdata/hyb_16"}
 TYPE=${TYPE:="release"}
 
 # Run the syncer now
@@ -15,7 +16,7 @@ TYPE=${TYPE:="release"}
     --syncer $1 \
     --byzantine false > logs/syncer.log &
 
-for((i=0;i<3;i++)); do
+for((i=0;i<11;i++)); do
 ./target/$TYPE/node \
     --config $TESTDIR/nodes-$i.json \
     --ip ip_file \
@@ -25,7 +26,7 @@ for((i=0;i<3;i++)); do
     --byzantine false > logs/$i.log &
 done
 
-for((i=3;i<4;i++)); do
+for((i=11;i<16;i++)); do
 ./target/$TYPE/node \
     --config $TESTDIR/nodes-$i.json \
     --ip ip_file \
