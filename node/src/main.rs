@@ -25,6 +25,15 @@ async fn main() -> Result<()> {
         .expect("Unable to parse syncer ip file");
     let conf_file = std::path::Path::new(conf_str); // config path for node i
     let str = String::from(conf_str);
+    let byz_flag = m.value_of("byz")
+        .expect("Unable to parse Byzantine flag");
+    let node_normal:bool = match byz_flag {
+        "true"=> true,
+        "false" => false,
+        _=>{
+            panic!("Byz flag invalid value");
+        }
+    };
 
     // load config for node-i
     let mut config = match conf_file
@@ -58,7 +67,7 @@ async fn main() -> Result<()> {
     let exit_tx;
     match vss_type{
         "pbft" => {
-            exit_tx = pbft::node::Context::spawn(config, input_value.parse().unwrap()).unwrap();
+            exit_tx = pbft::node::Context::spawn(config, input_value.parse().unwrap(), node_normal).unwrap();
         },
         "sync" => {
             let f_str = syncer_file.to_string();
