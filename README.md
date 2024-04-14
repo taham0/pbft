@@ -1,4 +1,4 @@
-## Implemeting PBFT using Reliable Broadcast
+## Implementing PBFT using Reliable Broadcast
 
 I implemented the pbft algorithm and tested it using the hyb_4 dataset with results as expected. In the following paragraph, I will provide details regarding my implementation.
 
