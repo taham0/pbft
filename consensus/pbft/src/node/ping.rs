@@ -102,7 +102,22 @@ impl Context {
         match delivery_res {
             Some(vec2) => {
                 log::info!("Delivering vector: {:?}", vec2);
-                let result = format!("{:?}", vec2);
+
+                let mut vec3 = vec2.clone();
+
+                // get the median value
+                vec3.sort_unstable();
+
+                let result: String;
+    
+                let mid = vec3.len() / 2;
+                if vec3.len() % 2 == 0 {
+                    let mid_val = (vec3[mid - 1] as f64 + vec3[mid] as f64) / 2.0;
+                    result = format!("{:?}", mid_val);
+                } else {
+                    // If odd, return the middle element
+                    result = format!("{:?}", vec3[mid]);
+                }
 
                 self.terminate(result).await;
             },
