@@ -26,6 +26,7 @@ pub struct Context {
     pub quorum: usize,
     pub echo: bool,
     pub echo_quorum: usize,
+    pub vec_counts: HashMap<Vec<u64>, u64>,
 
     /// Secret Key map
     pub sec_key_map:HashMap<Replica, Vec<u8>>,
@@ -112,7 +113,8 @@ impl Context {
                 inp_message:message,
                 values: values,
                 echo: true,
-                echo_quorum: 0
+                echo_quorum: 0,
+                vec_counts: HashMap::default(),
             };
             
             for (id, sk_data) in config.sk_map.clone() {
@@ -221,6 +223,15 @@ impl Context {
         }
 
         Ok(())
+    }
+
+    pub async fn terminate(&mut self, res: String) {
+        log::info!("terminating..");
+        let cancel_handler = self.sync_send.send(0,
+            SyncMsg { sender: self.myid, state: SyncState::COMPLETED, value:res}
+        ).await;
+
+        self.add_cancel_handler(cancel_handler);
     }
 }
 
