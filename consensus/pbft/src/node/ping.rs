@@ -7,6 +7,7 @@ impl Context {
     // we intend to modify the variable in the function. Otherwise, it need not be borrowed as mutable.
     // In this example, the mut can (and must) be removed because we are not modifying the Context inside
     // the function. 
+    
     pub async fn start_init(self: &mut Context) {
         let protocol_msg = ProtMsg::Init(
             self.inp_message
@@ -65,21 +66,52 @@ impl Context {
         log::info!("received values vector {:?} from node {:?}", values, sender_id);
         self.echo_quorum += 1;
 
-        if self.echo_quorum == self.num_faults + 1 {
-            if self.echo {
-                // broadcast echo msg
-                self.broadcast(ProtMsg::Echo(Msg {
-                    content: (values.clone()), 
-                    origin: (self.myid) 
-                })).await;
+        let count = self.vec_counts.entry(values.clone()).or_insert(0);
+        *count += 1;
 
-                self.echo = false;
-            }
+        let f_plus_one_responses = (self.num_faults + 1) as u64;
+
+        let result = self.vec_counts.iter()
+            .find(|&(_, &count) | count == f_plus_one_responses)
+            .map(|(vec, _)| vec.clone());
+
+        match result {
+            Some(vec) => {
+                log::info!("Found vector: {:?}", vec);
+
+                if self.echo {
+                    // broadcast echo msg
+                    self.broadcast(ProtMsg::Echo(Msg {
+                        content: (vec.clone()), 
+                        origin: (self.myid) 
+                    })).await;
+    
+                    self.echo = false;
+                }
+            },
+            None => (),
         }
 
-        else if self.echo_quorum == self.num_nodes - self.num_faults {
-            // deliver values
-            log::info!("Delivering value vector {:?}", values);
+        // check if enough responses received for delivery
+        let n_minus_f_responses = (self.num_nodes - self.num_faults) as u64;
+
+        let delivery_res = self.vec_counts.iter()
+            .find(|&(_, &count) | count == n_minus_f_responses)
+            .map(|(vec2, _)| vec2.clone());
+
+        match delivery_res {
+            Some(vec2) => {
+                log::info!("Delivering vector: {:?}", vec2);
+                let result = format!("{:?}", vec2);
+
+                self.terminate(result).await;
+            },
+            None => (),
         }
+
+        // if self.echo_quorum == self.num_nodes - self.num_faults {
+        //     // deliver values
+        //     log::info!("Delivering value vector {:?}", values);
+        // }
     }
 }
