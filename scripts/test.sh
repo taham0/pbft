@@ -20,9 +20,9 @@ for((i=0;i<4;i++)); do
     --config $TESTDIR/nodes-$i.json \
     --ip ip_file \
     --protocol pbft \
-    --input $2 \
+    --input ${vals[$i]} \
     --syncer $1 \
-    --byzantine $3 > logs/$i.log &
+    --byzantine $2 > logs/$i.log &
 done
 
 # sudo lsof -ti:7000-7015 | xargs kill -9

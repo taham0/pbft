@@ -7,33 +7,9 @@ impl Context {
     // we intend to modify the variable in the function. Otherwise, it need not be borrowed as mutable.
     // In this example, the mut can (and must) be removed because we are not modifying the Context inside
     // the function. 
-    // pub async fn start_ping(self: &mut Context){
-    //     // Draft a message
-    //     let data;
-
-    //     if self.is_leader {
-    //         data = "I am leader".to_string();
-    //     } else {
-    //         data = "I am not leader".to_string();
-    //     }
-
-    //     let msg = Msg{
-    //         content: data.as_bytes().to_vec(),
-    //         origin: self.myid
-    //     };
-        
-    //     // Wrap the message in a type
-    //     // Use different types of messages like INIT, ECHO, .... for the Bracha's RBC implementation
-    //     // let protocol_msg = ProtMsg::Init(msg, self.myid);
-    //     let protocol_msg = ProtMsg::Ping(msg, 1);
-
-    //     // Broadcast the message to everyone
-    //     self.broadcast(protocol_msg).await;
-    // }
-
     pub async fn start_init(self: &mut Context) {
         let protocol_msg = ProtMsg::Init(
-            self.myid as u64
+            self.inp_message
         );
 
         // echo propose value
@@ -90,13 +66,15 @@ impl Context {
         self.echo_quorum += 1;
 
         if self.echo_quorum == self.num_faults + 1 {
-            // broadcast echo msg
-            self.broadcast(ProtMsg::Echo(Msg {
-                content: (values.clone()), 
-                origin: (self.myid) 
-            })).await;
+            if self.echo {
+                // broadcast echo msg
+                self.broadcast(ProtMsg::Echo(Msg {
+                    content: (values.clone()), 
+                    origin: (self.myid) 
+                })).await;
 
-            self.echo = false;
+                self.echo = false;
+            }
         }
 
         else if self.echo_quorum == self.num_nodes - self.num_faults {

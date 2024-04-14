@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
     let exit_tx;
     match vss_type{
         "pbft" => {
-            exit_tx = pbft::node::Context::spawn(config, input_value.as_bytes().to_vec()).unwrap();
+            exit_tx = pbft::node::Context::spawn(config, input_value.parse().unwrap()).unwrap();
         },
         "sync" => {
             let f_str = syncer_file.to_string();

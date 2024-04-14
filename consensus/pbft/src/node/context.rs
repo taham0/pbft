@@ -10,13 +10,6 @@ use types::{{WrapperMsg, Replica, ProtMsg}, SyncMsg, SyncState};
 
 use super::{Handler, SyncHandler};
 
-fn vec_to_u64_big_endian(bytes: Vec<u8>) -> u64 {
-    let mut num = 0u64;
-    for (index, &byte) in bytes.iter().enumerate() {
-        num |= (byte as u64) << ((7 - index) * 8);
-    }
-    num
-}
 pub struct Context {
     /// Networking context
     pub net_send: TcpReliableSender<Replica,WrapperMsg,Acknowledgement>,
@@ -28,7 +21,7 @@ pub struct Context {
     pub num_nodes: usize,
     pub myid: usize,
     pub num_faults: usize,
-    pub inp_message:Vec<u8>,
+    pub inp_message:u64,
     pub values: Vec<u64>,
     pub quorum: usize,
     pub echo: bool,
@@ -49,7 +42,7 @@ pub struct Context {
 impl Context {
     pub fn spawn(
         config:Node,
-        message: Vec<u8>
+        message: u64
     )->anyhow::Result<oneshot::Sender<()>>{
         let mut consensus_addrs :FnvHashMap<Replica,SocketAddr>= FnvHashMap::default();
 
@@ -58,10 +51,6 @@ impl Context {
             let address:SocketAddr = address.parse().expect("Unable to parse address");
             consensus_addrs.insert(*replica, SocketAddr::from(address.clone()));
         }
-
-        let number = vec_to_u64_big_endian(message.clone());
-
-        log::info!("number is {:?}", number);
 
         let mut is_leader = false;
 
