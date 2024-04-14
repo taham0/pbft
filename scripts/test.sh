@@ -15,14 +15,24 @@ TYPE=${TYPE:="release"}
     --syncer $1 \
     --byzantine false > logs/syncer.log &
 
-for((i=0;i<4;i++)); do
+for((i=0;i<3;i++)); do
 ./target/$TYPE/node \
     --config $TESTDIR/nodes-$i.json \
     --ip ip_file \
     --protocol pbft \
     --input ${vals[$i]} \
     --syncer $1 \
-    --byzantine $2 > logs/$i.log &
+    --byzantine false > logs/$i.log &
+done
+
+for((i=3;i<4;i++)); do
+./target/$TYPE/node \
+    --config $TESTDIR/nodes-$i.json \
+    --ip ip_file \
+    --protocol pbft \
+    --input ${vals[$i]} \
+    --syncer $1 \
+    --byzantine true > logs/$i.log &
 done
 
 # sudo lsof -ti:7000-7015 | xargs kill -9
